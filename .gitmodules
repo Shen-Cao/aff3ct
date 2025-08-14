@@ -1,12 +1,12 @@
 [submodule "lib/MIPP"]
 	path = lib/MIPP
-	url = ../MIPP
+	url = https://github.com/aff3ct/MIPP.git
 [submodule "conf"]
 	path = conf
-	url = ../configuration_files
+	url = https://github.com/aff3ct/configuration_files.git
 [submodule "refs"]
 	path = refs
-	url = ../error_rate_references
+	url = https://github.com/aff3ct/error_rate_references.git
 [submodule "lib/rang"]
 	path = lib/rang
 	url = https://github.com/agauniyal/rang.git
@@ -15,4 +15,4 @@
 	url = https://github.com/HowardHinnant/date.git
 [submodule "lib/cli"]
 	path = lib/cli
-	url = ../cli
+	url = https://github.com/aff3ct/cli.git
