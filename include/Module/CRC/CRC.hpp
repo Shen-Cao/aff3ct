@@ -20,7 +20,7 @@ namespace module
 {
 	namespace crc
 	{
-		enum class tsk : size_t { build, extract, check, check_packed, SIZE };
+		enum class tsk : size_t { build, extract, check, check_packed, set_crc_const, check_crc_const, SIZE };
 
 		namespace sck
 		{
@@ -28,6 +28,8 @@ namespace module
 			enum class extract      : size_t { V_K1, V_K2, status };
 			enum class check        : size_t { V_K       , status };
 			enum class check_packed : size_t { V_K       , status };
+			enum class set_crc_const   : size_t { V_crc     , status };
+			enum class check_crc_const : size_t { V_K       , status };
 		}
 	}
 
@@ -48,6 +50,8 @@ public:
 	inline Socket& operator[](const crc::sck::build   s);
 	inline Socket& operator[](const crc::sck::extract s);
 	inline Socket& operator[](const crc::sck::check   s);
+	inline Socket& operator[](const crc::sck::set_crc_const   s);
+	inline Socket& operator[](const crc::sck::check_crc_const s);
 
 protected:
 	const int K; /*!< Number of information bits (the CRC bits are not included in K) */
@@ -123,6 +127,18 @@ public:
 	// bool check_packed(const B *V_K, const int n_frames = -1, const int frame_id = -1);
 	bool check_packed(const B *V_K, const int frame_id = -1, const bool managed_memory = true);
 
+	template <class A = std::allocator<B>>
+	void set_crc_const(const std::vector<B,A>& V_crc, const int frame_id = -1, const bool managed_memory = true);
+
+	// bool check_packed(const B *V_K, const int n_frames = -1, const int frame_id = -1);
+	void set_crc_const(const B *V_crc, const int frame_id = -1, const bool managed_memory = true);
+	
+	template <class A = std::allocator<B>>
+	bool check_crc_const(const std::vector<B,A>& V_K, const int frame_id = -1, const bool managed_memory = true);
+
+	// bool check_packed(const B *V_K, const int n_frames = -1, const int frame_id = -1);
+	bool check_crc_const(const B *V_K, const int frame_id = -1, const bool managed_memory = true);
+
 protected:
 	virtual void _build(const B *U_K1, B *U_K2, const size_t frame_id);
 
@@ -131,6 +147,10 @@ protected:
 	virtual bool _check(const B *V_K, const size_t frame_id);
 
 	virtual bool _check_packed(const B *V_K, const size_t frame_id);
+
+	virtual void _set_crc_const(const B *V_crc, const size_t frame_id);
+
+	virtual bool _check_crc_const(const B *V_K, const size_t frame_id);
 };
 }
 }

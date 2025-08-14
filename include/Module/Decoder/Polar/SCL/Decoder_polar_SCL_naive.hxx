@@ -24,10 +24,15 @@ Decoder_polar_SCL_naive<B,R,F,G>
   metric_init(std::numeric_limits<R>::min()),
   frozen_bits(frozen_bits),
   L(L),
-  polar_trees(L, tools::Binary_tree_metric<Contents_SCL<B,R>,R>(this->m + 1, metric_init))
+  polar_trees(L, tools::Binary_tree_metric<Contents_SCL<B,R>,R>(this->m + 1, metric_init)), 
+  // add a bool flag to indicate whether the decoding was successful or not
+  decode_success((bool)true)
 {
 	const std::string name = "Decoder_polar_SCL_naive";
 	this->set_name(name);
+
+	// SCL decoder will not fail to decode, so we set the fail flag to true by default
+	this->decode_success = true;
 
 	if (!tools::is_power_of_2(this->N))
 	{
@@ -293,7 +298,8 @@ int Decoder_polar_SCL_naive<B,R,F,G>
 //	(*this)[dec::tsk::decode_siho].update_timer(dec::tm::decode_siho::decode, d_decod);
 //	(*this)[dec::tsk::decode_siho].update_timer(dec::tm::decode_siho::store,  d_store);
 
-	return 0;
+	return this->decode_success ? 0 : -1;
+	// return 0;
 }
 
 template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
@@ -316,7 +322,8 @@ int Decoder_polar_SCL_naive<B,R,F,G>
 //	(*this)[dec::tsk::decode_siho_cw].update_timer(dec::tm::decode_siho_cw::decode, d_decod);
 //	(*this)[dec::tsk::decode_siho_cw].update_timer(dec::tm::decode_siho_cw::store,  d_store);
 
-	return 0;
+	return this->decode_success ? 0 : -1;
+	// return 0;
 }
 
 template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>

@@ -38,6 +38,20 @@ Socket& CRC<B>
 }
 
 template <typename B>
+Socket& CRC<B>
+::operator[](const crc::sck::set_crc_const s)
+{
+	return Module::operator[]((size_t)crc::tsk::set_crc_const)[(size_t)s];
+}
+
+template <typename B>
+Socket& CRC<B>
+::operator[](const crc::sck::check_crc_const s)
+{
+	return Module::operator[]((size_t)crc::tsk::check_crc_const)[(size_t)s];
+}
+
+template <typename B>
 CRC<B>
 ::CRC(const int K, const int size)
 : Module(), K(K), size(size)
@@ -99,6 +113,28 @@ CRC<B>
 		auto &crc = static_cast<CRC<B>&>(m);
 
 		auto ret = crc._check_packed(static_cast<B*>(t[p4s_V_K].get_dataptr()), frame_id);
+
+		return ret ? status_t::SUCCESS : status_t::FAILURE_STOP;
+	});
+
+	auto &p5 = this->create_task("set_crc_const");
+	auto p5s_V_crc = this->template create_socket_in<B>(p5, "V_crc", this->size);
+	this->create_codelet(p5, [p5s_V_crc](Module &m, Task &t, const size_t frame_id) -> int
+	{
+		auto &crc = static_cast<CRC<B>&>(m);
+
+		crc._set_crc_const(static_cast<B*>(t[p5s_V_crc].get_dataptr()), frame_id);
+
+		return status_t::SUCCESS;
+	});
+
+	auto &p6 = this->create_task("check_crc_const");
+	auto p6s_V_K = this->template create_socket_in<B>(p6, "V_K", this->K);
+	this->create_codelet(p6, [p6s_V_K](Module &m, Task &t, const size_t frame_id) -> int
+	{
+		auto &crc = static_cast<CRC<B>&>(m);
+
+		auto ret = crc._check_crc_const(static_cast<B*>(t[p6s_V_K].get_dataptr()), frame_id);
 
 		return ret ? status_t::SUCCESS : status_t::FAILURE_STOP;
 	});
@@ -252,6 +288,64 @@ bool CRC<B>
 }
 
 template <typename B>
+template <class A>
+void CRC<B>
+::set_crc_const(const std::vector<B,A>& V_crc, const int frame_id, const bool managed_memory)
+{
+	(*this)[crc::sck::set_crc_const::V_crc].bind(V_crc);
+	(*this)[crc::tsk::set_crc_const].exec(frame_id, managed_memory);
+}
+
+template <typename B>
+void CRC<B>
+::set_crc_const(const B *V_crc, const int frame_id, const bool managed_memory)
+{
+	(*this)[crc::sck::set_crc_const::V_crc].bind(V_crc);
+	(*this)[crc::tsk::set_crc_const].exec(frame_id, managed_memory);
+}
+
+template <typename B>
+template <class A>
+bool CRC<B>
+::check_crc_const(const std::vector<B,A>& V_K, const int frame_id, const bool managed_memory)
+{
+	(*this)[crc::sck::check_crc_const::V_K].bind(V_K);
+	const auto &status = (*this)[crc::tsk::check_crc_const].exec(frame_id, managed_memory);
+	if (frame_id == -1)
+	{
+		size_t w = 0;
+		while (w < this->get_n_waves() && status[w] == status_t::SUCCESS)
+			w++;
+		return w == this->get_n_waves();
+	}
+	else
+	{
+		const auto w = (frame_id % this->get_n_frames()) / this->get_n_frames_per_wave();
+		return status[w] == status_t::SUCCESS;
+	}
+}
+
+template <typename B>
+bool CRC<B>
+::check_crc_const(const B *V_K, const int frame_id, const bool managed_memory)
+{
+	(*this)[crc::sck::check_crc_const::V_K].bind(V_K);
+	const auto &status = (*this)[crc::tsk::check_crc_const].exec(frame_id, managed_memory);
+	if (frame_id == -1)
+	{
+		size_t w = 0;
+		while (w < this->get_n_waves() && status[w] == status_t::SUCCESS)
+			w++;
+		return w == this->get_n_waves();
+	}
+	else
+	{
+		const auto w = (frame_id % this->get_n_frames()) / this->get_n_frames_per_wave();
+		return status[w] == status_t::SUCCESS;
+	}
+}
+
+template <typename B>
 void CRC<B>
 ::_build(const B *U_K1, B *U_K2, const size_t frame_id)
 {
@@ -276,6 +370,21 @@ bool CRC<B>
 template <typename B>
 bool CRC<B>
 ::_check_packed(const B *V_K, const size_t frame_id)
+{
+	throw tools::unimplemented_error(__FILE__, __LINE__, __func__);
+	return false;
+}
+
+template <typename B>
+void CRC<B>
+::_set_crc_const(const B *V_crc, const size_t frame_id)
+{
+	throw tools::unimplemented_error(__FILE__, __LINE__, __func__);
+}
+
+template <typename B>
+bool CRC<B>
+::_check_crc_const(const B *V_K, const size_t frame_id)
 {
 	throw tools::unimplemented_error(__FILE__, __LINE__, __func__);
 	return false;

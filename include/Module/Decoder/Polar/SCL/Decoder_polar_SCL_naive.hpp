@@ -46,6 +46,9 @@ protected:
 	std::vector<tools::Binary_tree_metric<Contents_SCL<B,R>,R>> polar_trees;
 	std::vector<std::vector<tools::Binary_node<Contents_SCL<B,R>>*>> leaves_array;
 
+	// add a bool flag to indicate whether the decoding was successful or not
+	bool decode_success;
+
 public:
 	Decoder_polar_SCL_naive(const int& K, const int& N, const int& L, const std::vector<bool>& frozen_bits);
 	virtual ~Decoder_polar_SCL_naive();

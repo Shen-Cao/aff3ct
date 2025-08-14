@@ -16,7 +16,8 @@ CRC_polynomial<B>
 : CRC<B>(K, size ? size : CRC_polynomial<B>::get_size(CRC_polynomial<B>::get_name(poly_key))),
   polynomial       (0                                     ),
   polynomial_packed(CRC_polynomial<B>::get_value(poly_key)),
-  buff_crc         (0                                     )
+  buff_crc         (0                                     ),
+  crc_const        (0                                     )
 {
 	const std::string name = "CRC_polynomial";
 	this->set_name(name);
@@ -42,6 +43,10 @@ CRC_polynomial<B>
 		polynomial.push_back((polynomial_packed >> ((this->size -1) -i)) & 1);
 
 	buff_crc.resize((this->K + this->size) * this->n_frames);
+	// Customize a crc constant here 
+	// Use set_crc_const to set it
+	// Use check_crc_const to use this const check a K-sized input
+	crc_const.resize((this->size) * this->n_frames);
 }
 
 template <typename B>
@@ -128,7 +133,7 @@ void CRC_polynomial<B>
 		if (buff_crc[i])
 			for (auto j = 0; j <= this->size; j++)
 				if (this->polynomial[j])
-					buff_crc[i+j] = !buff_crc[i+j];
+					if (this->polynomial[j]) buff_crc[i + j] = !buff_crc[i + j];
 
 	if (U_out != buff_crc.data())
 		std::copy(buff_crc.begin() + loop_size, buff_crc.begin() + loop_size + this->size, U_out + off_out);
@@ -181,6 +186,33 @@ void CRC_polynomial<B>
 		const auto new_buff_crc_size = (old_buff_crc_size / old_n_frames) * n_frames;
 		this->buff_crc.resize(new_buff_crc_size);
 	}
+}
+
+template <typename B>
+void CRC_polynomial<B>
+::_set_crc_const(const B *V_crc, const size_t frame_id)
+{
+	// std::clog << rang::tag::warning << "Start setting crc constant" << std::endl;
+	std::fill(this->crc_const.begin(), this->crc_const.begin() + this->size, (B)0);
+	// std::clog << rang::tag::warning << "Flushing crc constant success, copying data from V_crc to crc_const" << std::endl;
+	std::copy(V_crc, V_crc + this->size, this->crc_const.begin());
+}
+
+template <typename B>
+bool CRC_polynomial<B>
+::_check_crc_const(const B *V_K, const size_t frame_id)
+{
+	std::vector<B> V_K_crc(this->K + this->size);
+	this->_build(V_K, V_K_crc.data(), frame_id);
+	auto off = this->K;
+	auto i = 0;
+	while ((i < this->size) &&
+	       // because the position of the bit in a variable can vary,
+	       // the idea is to test: (this->crc_const[i] == V_K[off +i])
+	       ((this->crc_const[i] || !V_K_crc[off +i]) && (!this->crc_const[i] || V_K_crc[off +i])))
+		i++;
+
+	return (i == this->size);
 }
 
 // ==================================================================================== explicit template instantiation

@@ -24,6 +24,7 @@ protected:
 	std::vector<B> polynomial;
 	unsigned       polynomial_packed;
 	std::vector<B> buff_crc;
+	std::vector<B> crc_const;
 
 public:
 	CRC_polynomial(const int K, const std::string &poly_key, const int size = 0);
@@ -47,6 +48,9 @@ protected:
 	               const int off_in,
 	               const int off_out,
 	               const int loop_size);
+
+    virtual void _set_crc_const(const B *V_crc, const size_t frame_id);
+	virtual bool _check_crc_const(const B *V_K, const size_t frame_id);
 };
 }
 }

@@ -5,6 +5,14 @@
 #ifndef PATTERN_POLAR_INTERFACE_HPP_
 #define PATTERN_POLAR_INTERFACE_HPP_
 
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#include <processenv.h> // GetEnvironmentVariableA
+#else
+#include <cstdlib> // std::getenv
+#include <stdint.h>
+#endif
+
 #include <string>
 
 #include "Tools/Algo/Tree/Binary/Binary_node.hpp"

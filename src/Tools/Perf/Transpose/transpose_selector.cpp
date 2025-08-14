@@ -1,5 +1,13 @@
 #include <limits>
 
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#include <processenv.h> // GetEnvironmentVariableA
+#else
+#include <cstdlib> // std::getenv
+#include <stdint.h>
+#endif
+
 #include "Tools/Exception/exception.hpp"
 #ifdef __AVX2__
 #include "Tools/Perf/Transpose/transpose_AVX.h"

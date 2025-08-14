@@ -18,7 +18,7 @@ namespace module
 {
 	namespace dec
 	{
-		enum class tsk : size_t { decode_hiho, decode_hiho_cw, decode_siho, decode_siho_cw, decode_siso, decode_siso_alt, SIZE };
+		enum class tsk : size_t { decode_hiho, decode_hiho_cw, decode_siho, decode_siho_cw, decode_siso, decode_siso_alt, set_crc_const, SIZE };
 
 		namespace sck
 		{
@@ -28,6 +28,7 @@ namespace module
 			enum class decode_siho_cw : size_t { Y_N,       CWD,  V_N, status };
 			enum class decode_siso    : size_t { Y_N1,      CWD, Y_N2, status };
 			enum class decode_siso_alt: size_t { sys,  par, CWD,  ext, status };
+			enum class set_crc_const  : size_t { V_crc               , status };
 		}
 
 		namespace tm

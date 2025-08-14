@@ -7,6 +7,8 @@
 
 #include <memory>
 
+#include "Module/Task.hpp"
+#include "Module/Socket.hpp"
 #include "Tools/Code/Polar/decoder_polar_functions.h"
 #include "Module/CRC/CRC.hpp"
 #include "Module/Decoder/Polar/SCL/Decoder_polar_SCL_naive.hpp"
@@ -22,16 +24,27 @@ protected:
 	std::shared_ptr<CRC<B>> crc;
 
 public:
+	inline Task&   operator[](const dec::tsk                 t);
+	inline Socket& operator[](const dec::sck::set_crc_const  s);
+
 	Decoder_polar_SCL_naive_CA(const int& K, const int& N, const int& L, const std::vector<bool>& frozen_bits,
 	                           const CRC<B>& crc);
 
 	virtual ~Decoder_polar_SCL_naive_CA() = default;
 
 	virtual Decoder_polar_SCL_naive_CA<B,R,F,G>* clone() const;
+	
+	template <class A = std::allocator<B>>
+	void set_crc_const(const std::vector<B,A>& V_crc, const int frame_id = -1, const bool managed_memory = true);
+
+	// bool check_packed(const B *V_K, const int n_frames = -1, const int frame_id = -1);
+	void set_crc_const(const B *V_crc, const int frame_id = -1, const bool managed_memory = true);
 
 protected:
 	virtual void deep_copy(const Decoder_polar_SCL_naive_CA<B,R,F,G>& m);
 	virtual void select_best_path(const size_t frame_id);
+
+	virtual void _set_crc_const(const B *V_crc, const size_t frame_id);
 };
 }
 }
