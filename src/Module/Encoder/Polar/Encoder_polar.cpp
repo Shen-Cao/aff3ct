@@ -48,6 +48,14 @@ void Encoder_polar<B>
 
 template <typename B>
 void Encoder_polar<B>
+::_light_encode(const B *U_N, B *X_N, const size_t frame_id)
+{
+	std::copy(U_N, U_N + this->N, X_N);
+	this->light_encode(X_N);
+}
+
+template <typename B>
+void Encoder_polar<B>
 ::light_encode(B *bits)
 {
 	for (auto k = (this->N >> 1); k > 0; k >>= 1)

@@ -37,6 +37,7 @@ public:
 
 protected:
 	virtual void _encode(const B *U_K, B *X_N, const size_t frame_id);
+	virtual void _light_encode(const B *U_N, B *X_N, const size_t frame_id);
 	void convert(const B *U_K, B *U_N);
 };
 }

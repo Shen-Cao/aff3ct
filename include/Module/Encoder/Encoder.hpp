@@ -21,11 +21,12 @@ namespace module
 {
 	namespace enc
 	{
-		enum class tsk : size_t { encode, SIZE };
+		enum class tsk : size_t { encode, light_encode, SIZE };
 
 		namespace sck
 		{
 			enum class encode : size_t { U_K, X_N, status };
+			enum class light_encode : size_t { U_N, X_N, status };
 		}
 	}
 
@@ -44,6 +45,7 @@ class Encoder : public Module, public tools::Interface_set_seed
 public:
 	inline Task&   operator[](const enc::tsk         t);
 	inline Socket& operator[](const enc::sck::encode s);
+	inline Socket& operator[](const enc::sck::light_encode s);
 
 protected:
 	const int             K;             /*!< Number of information bits in one frame */
@@ -95,6 +97,11 @@ public:
 	void encode(const std::vector<B,A>& U_K, std::vector<B,A>& X_N, const int frame_id = -1,
 	            const bool managed_memory = true);
 
+	void light_encode(const B *U_N, B *X_N, const int frame_id = -1, const bool managed_memory = true);
+	
+	template <class A = std::allocator<B>>
+	void light_encode(const std::vector<B,A>& U_N, std::vector<B,A>& X_N, const int frame_id = -1, const bool managed_memory = true);
+
 	void encode(const B *U_K, B *X_N, const int frame_id = -1, const bool managed_memory = true);
 
 	template <class A = std::allocator<B>>
@@ -120,6 +127,8 @@ public:
 
 protected:
 	virtual void _encode(const B *U_K, B *X_N, const size_t frame_id);
+
+	virtual void _light_encode(const B *U_N, B *X_N, const size_t frame_id);
 
 	void set_sys(const bool sys);
 };

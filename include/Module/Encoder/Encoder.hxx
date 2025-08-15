@@ -26,6 +26,13 @@ Socket& Encoder<B>
 }
 
 template <typename B>
+Socket& Encoder<B>
+::operator[](const enc::sck::light_encode s)
+{
+	return Module::operator[]((size_t)enc::tsk::light_encode)[(size_t)s];
+}
+
+template <typename B>
 Encoder<B>
 ::Encoder(const int K, const int N)
 : Module(),
@@ -83,6 +90,19 @@ Encoder<B>
 				std::copy(static_cast<B*>(t[ps_X_N].get_dataptr()) + (f +0) * enc.N,
 				          static_cast<B*>(t[ps_X_N].get_dataptr()) + (f +1) * enc.N,
 				          enc.X_N_mem[frame_id + f].begin());
+
+		return status_t::SUCCESS;
+	});
+
+	auto &p1 = this->create_task("light_encode");
+	auto p1s_U_N = this->template create_socket_in <B>(p1, "U_N", this->N);
+	auto p1s_X_N = this->template create_socket_out<B>(p1, "X_N", this->N);
+	this->create_codelet(p1, [p1s_U_N, p1s_X_N](Module &m, Task &t, const size_t frame_id) -> int
+	{
+		auto &enc = static_cast<Encoder<B>&>(m);
+		enc._light_encode(static_cast<B*>(t[p1s_U_N].get_dataptr()),
+		            static_cast<B*>(t[p1s_X_N].get_dataptr()),
+		            frame_id);
 
 		return status_t::SUCCESS;
 	});
@@ -187,6 +207,25 @@ void Encoder<B>
 
 template <typename B>
 template <class A>
+void Encoder<B>
+::light_encode(const std::vector<B,A>& U_N, std::vector<B,A>& X_N, const int frame_id, const bool managed_memory)
+{
+	(*this)[enc::sck::light_encode::U_N].bind(U_N);
+	(*this)[enc::sck::light_encode::X_N].bind(X_N);
+	(*this)[enc::tsk::light_encode].exec(frame_id, managed_memory);
+}
+
+template <typename B>
+void Encoder<B>
+::light_encode(const B *U_N, B *X_N, const int frame_id, const bool managed_memory)
+{
+	(*this)[enc::sck::light_encode::U_N].bind(U_N);
+	(*this)[enc::sck::light_encode::X_N].bind(X_N);
+	(*this)[enc::tsk::light_encode].exec(frame_id, managed_memory);
+}
+
+template <typename B>
+template <class A>
 bool Encoder<B>
 ::is_codeword(const std::vector<B,A>& X_N)
 {
@@ -225,6 +264,13 @@ int Encoder<B>
 template <typename B>
 void Encoder<B>
 ::_encode(const B *U_K, B *X_N, const size_t frame_id)
+{
+	throw tools::unimplemented_error(__FILE__, __LINE__, __func__);
+}
+
+template <typename B>
+void Encoder<B>
+::_light_encode(const B *U_N, B *X_N, const size_t frame_id)
 {
 	throw tools::unimplemented_error(__FILE__, __LINE__, __func__);
 }
