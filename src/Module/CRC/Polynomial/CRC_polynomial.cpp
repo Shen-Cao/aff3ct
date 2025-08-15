@@ -133,7 +133,7 @@ void CRC_polynomial<B>
 		if (buff_crc[i])
 			for (auto j = 0; j <= this->size; j++)
 				if (this->polynomial[j])
-					if (this->polynomial[j]) buff_crc[i + j] = !buff_crc[i + j];
+					buff_crc[i + j] = !buff_crc[i + j];
 
 	if (U_out != buff_crc.data())
 		std::copy(buff_crc.begin() + loop_size, buff_crc.begin() + loop_size + this->size, U_out + off_out);
