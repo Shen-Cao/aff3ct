@@ -50,6 +50,21 @@ protected:
 	bool decode_success;
 
 public:
+	inline Task&   operator[](const dec::tsk                               t);
+	inline Socket& operator[](const dec::sck::decode_siho_cw_flexible_frozen  s);
+
+	template <class AR = std::allocator<R>, class AB = std::allocator<B>>
+	int decode_siho_cw_flexible_frozen(const std::vector<R,AR>& Y_N, const std::vector<B,AB>& F_N, std::vector<int8_t,AB>& CWD, std::vector<B,AB>& V_K,
+	                const int frame_id = -1, const bool managed_memory = true);
+
+	template <class AR = std::allocator<R>, class AB = std::allocator<B>>
+	int decode_siho_cw_flexible_frozen(const std::vector<R,AR>& Y_N, const std::vector<B,AB>& F_N, std::vector<B,AB>& V_K,
+	                const int frame_id = -1, const bool managed_memory = true);
+
+	int decode_siho_cw_flexible_frozen(const R *Y_N, const B *F_N, int8_t *CWD, B *V_K, const int frame_id = -1, const bool managed_memory = true);
+
+	int decode_siho_cw_flexible_frozen(const R *Y_N, const B *F_N, B *V_K, const int frame_id = -1, const bool managed_memory = true);
+
 	Decoder_polar_SCL_naive(const int& K, const int& N, const int& L, const std::vector<bool>& frozen_bits);
 	virtual ~Decoder_polar_SCL_naive();
 
@@ -67,6 +82,11 @@ protected:
 	        void _decode        (const size_t frame_id                      );
 	        int  _decode_siho   (const R *Y_N, B *V_K, const size_t frame_id);
 	        int  _decode_siho_cw(const R *Y_N, B *V_N, const size_t frame_id);
+			
+	        int _decode_siho_cw_flexible_frozen(const R *Y_N, const B *F_N, int8_t *CWD, B *V_N, const size_t frame_id);
+	        int _decode_siho_cw_flexible_frozen(const R *Y_N, const B *F_N,              B *V_N, const size_t frame_id);
+	        void _decode_flexible_frozen                     (const B *F_N,                      const size_t frame_id);
+
 	virtual void _store         (              B *V,   bool coded = false   ) const;
 
 private:
@@ -85,7 +105,7 @@ protected:
 
 	void recursive_allocate_nodes_contents  (      tools::Binary_node<Contents_SCL<B,R>>* node_curr, const int vector_size               );
 	void recursive_initialize_frozen_bits   (const tools::Binary_node<Contents_SCL<B,R>>* node_curr, const std::vector<bool>& frozen_bits);
-	void recursive_store                    (const tools::Binary_node<Contents_SCL<B,R>>* node_curr, B *V_K, int &k                      ) const;
+	void recursive_store                    (const tools::Binary_node<Contents_SCL<B,R>>* node_curr, B *V_K, int &k, bool contain_frozen ) const;
 	void recursive_deallocate_nodes_contents(      tools::Binary_node<Contents_SCL<B,R>>* node_curr                                      );
 
 	void apply_f     (const tools::Binary_node<Contents_SCL<B,R>>* node_curr);

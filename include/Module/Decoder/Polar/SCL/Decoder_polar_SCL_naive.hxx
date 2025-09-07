@@ -16,6 +16,21 @@ namespace aff3ct
 {
 namespace module
 {
+
+template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
+Task& Decoder_polar_SCL_naive<B,R,F,G>
+::operator[](const dec::tsk t)
+{
+	return Module::operator[]((size_t)t);
+}
+
+template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
+Socket& Decoder_polar_SCL_naive<B,R,F,G>
+::operator[](const dec::sck::decode_siho_cw_flexible_frozen s)
+{
+	return Module::operator[]((size_t)dec::tsk::decode_siho_cw_flexible_frozen)[(size_t)s];
+}
+
 template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
 Decoder_polar_SCL_naive<B,R,F,G>
 ::Decoder_polar_SCL_naive(const int& K, const int& N, const int& L, const std::vector<bool>& frozen_bits)
@@ -73,6 +88,27 @@ Decoder_polar_SCL_naive<B,R,F,G>
 	}
 	for (auto i = 0; i < L; i++)
 		leaves_array.push_back(this->polar_trees[i].get_leaves());
+
+	auto &pf = this->create_task("decode_siho_cw_flexible_frozen");
+	auto pfs_Y_N = this->template create_socket_in <R     >(pf, "Y_N", this->N); // R for float input
+	auto pfs_F_N = this->template create_socket_in <B     >(pf, "F_N", this->N); // B for int input
+	auto pfs_CWD = this->template create_socket_out<int8_t>(pf, "CWD",       1);
+	auto pfs_V_N = this->template create_socket_out<B     >(pf, "V_N", this->N);
+	this->create_codelet(pf, [pfs_Y_N, pfs_F_N, pfs_CWD, pfs_V_N](Module &m, Task &t, const size_t frame_id) -> int
+	{
+		auto &dec = static_cast<Decoder_polar_SCL_naive<B,R,F,G>&>(m);
+
+		auto ret = dec._decode_siho_cw_flexible_frozen(static_cast<R     *>(t[pfs_Y_N].get_dataptr()),
+		                            				   static_cast<B     *>(t[pfs_F_N].get_dataptr()),
+		                            				   static_cast<int8_t*>(t[pfs_CWD].get_dataptr()),
+		                            				   static_cast<B     *>(t[pfs_V_N].get_dataptr()),
+		                            				   frame_id);
+
+		if (dec.is_auto_reset())
+			dec._reset(frame_id);
+
+		return ret;
+	});
 }
 
 template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
@@ -195,6 +231,138 @@ void Decoder_polar_SCL_naive<B,R,F,G>
 		}
 		else
 		{
+			
+			// metrics vec used to store values of hypothetic path metrics
+			metrics_vec.clear();
+			auto min_phi = std::numeric_limits<R>::max();
+			for (auto path : active_paths)
+			{
+				auto cur_leaf = leaves_array[path][leaf_index];
+				R phi0 = tools::phi<B,R>(polar_trees[path].get_path_metric(), cur_leaf->get_c()->lambda[0],                 (B)0);
+				R phi1 = tools::phi<B,R>(polar_trees[path].get_path_metric(), cur_leaf->get_c()->lambda[0], tools::bit_init<B>());
+				metrics_vec.push_back(std::make_tuple(path,                 (B)0, phi0));
+				metrics_vec.push_back(std::make_tuple(path, tools::bit_init<B>(), phi1));
+
+				min_phi = std::min<R>(min_phi, phi0);
+				min_phi = std::min<R>(min_phi, phi1);
+			}
+
+			// normalization
+			for (auto vec : metrics_vec)
+				std::get<2>(vec) -= min_phi;
+
+			if (active_paths.size() <= (unsigned)(L / 2))
+			{
+				last_active_paths = active_paths;
+				for (auto path : last_active_paths)
+					this->duplicate_path(path, leaf_index);
+			}
+			else
+			{
+				// sort hypothetic metrics
+				std::sort(metrics_vec.begin(), metrics_vec.end(),
+					[](std::tuple<int,B,R> x, std::tuple<int,B,R> y){
+						return std::get<2>(x) < std::get<2>(y);
+					});
+
+				// search in worst metrics. If a path is found twice, erase it
+				for (auto it = metrics_vec.begin() + metrics_vec.size() / 2; it != metrics_vec.end(); ++it)
+				{
+					cur_path = std::get<0>(*it);
+
+					auto it_double = std::find_if(it +1, metrics_vec.end(),
+						[cur_path](std::tuple<int,B,R> x){
+							return std::get<0>(x) == cur_path;
+						});
+
+					if (it_double != metrics_vec.end())
+						active_paths.erase(std::get<0>(*it));
+				}
+
+				// remove worst metrics from list
+				metrics_vec.resize(metrics_vec.size() / 2);
+
+				for (auto it = metrics_vec.begin(); it != metrics_vec.end(); ++it)
+				{
+					cur_path = std::get<0>(*it);
+
+					auto it_double = std::find_if(it +1, metrics_vec.end(),
+						[cur_path](std::tuple<int,B,R> x){
+							return std::get<0>(x) == cur_path;
+						});
+
+					if (it_double != metrics_vec.end())
+					{
+						// duplicate
+						metrics_vec.erase(it_double);
+						duplicate_path(std::get<0>(*it), leaf_index);
+					}
+					else
+					{
+						// choose
+						leaves_array[std::get<0>(*it)][leaf_index]->get_c()->s[0] = std::get<1>(*it);
+						polar_trees[std::get<0>(*it)].set_path_metric(std::get<2>(*it));
+					}
+				}
+			}
+		}
+
+		// propagate sums
+		for (auto path : active_paths)
+			this->propagate_sums(leaves_array[path][leaf_index]);
+	}
+
+	this->select_best_path(frame_id);
+}
+
+template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
+void Decoder_polar_SCL_naive<B,R,F,G>
+::_decode_flexible_frozen(const B *F_N, const size_t frame_id)
+{
+	std::set<int> last_active_paths;
+	int cur_path;
+
+	// tuples to be sorted. <Path,estimated bit,metric>
+	std::vector<std::tuple<int,B,R>> metrics_vec;
+
+	// run through each leaf
+	for (auto leaf_index = 0 ; leaf_index < this->N; leaf_index++)
+	{
+		// compute LLR for current leaf
+		for (auto path : active_paths)
+			this->recursive_compute_llr(leaves_array[path][leaf_index], tools::compute_depth(leaf_index, this->m));
+
+		// if current leaf is a frozen bit
+		if (leaves_array[0][leaf_index]->get_c()->is_frozen_bit)
+		{
+			auto min_phi = std::numeric_limits<R>::max();
+			for (auto path : active_paths)
+			{
+				auto cur_leaf = leaves_array[path][leaf_index];
+                // force u_i to the frozen value f (NOT always 0)
+                // cur_leaf->get_c()->s[0] = F_N[leaf_index]; // This implementation is wrong...
+				if (F_N[leaf_index] == 0)
+				{
+					cur_leaf->get_c()->s[0] = 0;
+				}
+				else
+				{
+					cur_leaf->get_c()->s[0] = tools::bit_init<B>();
+				}
+				
+				// For frozen bits, we use the provided value directly as it represents the bit value (0 or 1)
+				auto phi_cur = tools::phi<R>(polar_trees[path].get_path_metric(), cur_leaf->get_c()->lambda[0], F_N[leaf_index]);
+				this->polar_trees[path].set_path_metric(phi_cur);
+				min_phi = std::min<R>(min_phi, phi_cur);
+			}
+
+			// normalization
+			for (auto path : active_paths)
+				this->polar_trees[path].set_path_metric(this->polar_trees[path].get_path_metric() - min_phi);
+		}
+		else
+		{
+			
 			// metrics vec used to store values of hypothetic path metrics
 			metrics_vec.clear();
 			auto min_phi = std::numeric_limits<R>::max();
@@ -327,6 +495,39 @@ int Decoder_polar_SCL_naive<B,R,F,G>
 }
 
 template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
+int Decoder_polar_SCL_naive<B,R,F,G>
+::_decode_siho_cw_flexible_frozen(const R *Y_N, const B *F_N, int8_t *CWD, B *V_N, const size_t frame_id)
+{
+	const auto status = this->_decode_siho_cw_flexible_frozen(Y_N, F_N, V_N, frame_id);
+	std::fill(CWD, CWD + this->get_n_frames_per_wave(), 0);
+	return status;
+}
+
+template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
+int Decoder_polar_SCL_naive<B,R,F,G>
+::_decode_siho_cw_flexible_frozen(const R *Y_N, const B *F_N, B *V_N, const size_t frame_id)
+{
+//	auto t_load = std::chrono::steady_clock::now(); // ----------------------------------------------------------- LOAD
+	this->_load(Y_N);
+//	auto d_load = std::chrono::steady_clock::now() - t_load;
+
+//	auto t_decod = std::chrono::steady_clock::now(); // -------------------------------------------------------- DECODE
+	this->_decode_flexible_frozen(F_N, frame_id);
+//	auto d_decod = std::chrono::steady_clock::now() - t_decod;
+
+//	auto t_store = std::chrono::steady_clock::now(); // --------------------------------------------------------- STORE
+	this->_store(V_N, true);
+//	auto d_store = std::chrono::steady_clock::now() - t_store;
+
+//	(*this)[dec::tsk::decode_siho].update_timer(dec::tm::decode_siho::load,   d_load);
+//	(*this)[dec::tsk::decode_siho].update_timer(dec::tm::decode_siho::decode, d_decod);
+//	(*this)[dec::tsk::decode_siho].update_timer(dec::tm::decode_siho::store,  d_store);
+
+	return this->decode_success ? 0 : -1;
+	// return 0;
+}
+
+template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
 void Decoder_polar_SCL_naive<B,R,F,G>
 ::_store(B *V, bool coded) const
 {
@@ -334,12 +535,26 @@ void Decoder_polar_SCL_naive<B,R,F,G>
 	if (!coded)
 	{
 		auto k = 0;
-		this->recursive_store(root, V, k);
+		this->recursive_store(root, V, k, false);
 	}
 	else
 	{
-		auto *contents_root = root->get_c();
-		std::copy(contents_root->s.begin(), contents_root->s.begin() + this->N, V);
+		auto k = 0;
+		this->recursive_store(root, V, k, true);
+
+		// Store the full codeword by collecting bits from leaf nodes
+		// Use the leaves_array to get the correct bit values from leaf nodes
+		// auto path = *active_paths.begin();
+		// for (int i = 0; i < this->N; i++) {
+		// 	// Get the bit value from the corresponding leaf node
+		// 	auto *leaf_node = leaves_array[path][i];
+		// 	auto *contents = leaf_node->get_c();
+		// 	// Convert bit values to 0 or 1
+		// 	V[i] = contents->s[0] ? 1 : 0;
+		// 	std::cout << "Storing Position " << i << " Value = " << contents->s[0] << std::endl;
+		// }
+
+		// std::copy(contents_root->s.begin(), contents_root->s.begin() + this->N, V);
 	}
 }
 
@@ -474,18 +689,31 @@ void Decoder_polar_SCL_naive<B,R,F,G>
 
 template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
 void Decoder_polar_SCL_naive<B,R,F,G>
-::recursive_store(const tools::Binary_node<Contents_SCL<B,R>>* node_curr, B *V_K, int &k) const
+::recursive_store(const tools::Binary_node<Contents_SCL<B,R>>* node_curr, B *V_K, int &k, bool contain_frozen) const
 {
 	auto *contents = node_curr->get_contents();
 
 	if (!node_curr->is_leaf()) // stop condition
 	{
-		this->recursive_store(node_curr->get_left(),  V_K, k); // recursive call
-		this->recursive_store(node_curr->get_right(), V_K, k); // recursive call
+		this->recursive_store(node_curr->get_left(),  V_K, k, contain_frozen); // recursive call
+		this->recursive_store(node_curr->get_right(), V_K, k, contain_frozen); // recursive call
 	}
 	else
-		if (!frozen_bits[node_curr->get_lane_id()])
+	{
+		if (contain_frozen)
+		{
 			V_K[k++] = contents->s[0] ? 1 : 0;
+			/*std::cout << "Storing position - " << k << " lane_id - " << node_curr->get_lane_id() << " content value: " << contents->s[0] << " V_N value: " << V_K[k-1] << " Is frozen: " << frozen_bits[node_curr->get_lane_id()] << std::endl;*/
+		}
+		else
+		{
+			if (!frozen_bits[node_curr->get_lane_id()])
+				{
+					V_K[k++] = contents->s[0] ? 1 : 0;
+					/*std::cout << "Storing position - " << k << " lane_id - " << node_curr->get_lane_id() << " content value: " << contents->s[0] << " V_N value: " << V_K[k-1] << " Is frozen: " << frozen_bits[node_curr->get_lane_id()] << std::endl;*/
+				}
+		}
+	}
 }
 
 template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
