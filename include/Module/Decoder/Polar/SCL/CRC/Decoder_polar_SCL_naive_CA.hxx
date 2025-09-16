@@ -84,8 +84,10 @@ void Decoder_polar_SCL_naive_CA<B,R,F,G>
 		// U_test_crc.clear();
 
 		for (auto leaf = 0 ; leaf < this->N ; leaf++)
-			if (!this->frozen_bits[leaf])
-				U_test.push_back(this->leaves_array[path][leaf]->get_c()->s[0]);
+			// if (!this->frozen_bits[leaf])
+			// 	U_test.push_back(this->leaves_array[path][leaf]->get_c()->s[0]);
+			// The CRC is applied to the whole string
+			U_test.push_back(this->leaves_array[path][leaf]->get_c()->s[0]);
 
 
 		// Use the customized method check_crc_const
