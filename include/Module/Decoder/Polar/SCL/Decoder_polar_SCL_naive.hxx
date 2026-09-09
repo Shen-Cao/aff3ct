@@ -32,6 +32,13 @@ Socket& Decoder_polar_SCL_naive<B,R,F,G>
 }
 
 template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
+Socket& Decoder_polar_SCL_naive<B,R,F,G>
+::operator[](const dec::sck::set_known_bits s)
+{
+	return Module::operator[]((size_t)dec::tsk::set_known_bits)[(size_t)s];
+}
+
+template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
 Decoder_polar_SCL_naive<B,R,F,G>
 ::Decoder_polar_SCL_naive(const int& K, const int& N, const int& L, const std::vector<bool>& frozen_bits)
 : Decoder_SIHO<B,R>(K, N),
@@ -109,6 +116,17 @@ Decoder_polar_SCL_naive<B,R,F,G>
 
 		return ret;
 	});
+
+	auto &pk = this->create_task("set_known_bits");
+	auto pks_KNOWN_BITS = this->template create_socket_in<B>(pk, "KNOWN_BITS", this->N);
+	this->create_codelet(pk, [pks_KNOWN_BITS](Module &m, Task &t, const size_t frame_id) -> int
+	{
+		auto &dec = static_cast<Decoder_polar_SCL_naive<B,R,F,G>&>(m);
+
+		dec._set_known_bits(static_cast<B*>(t[pks_KNOWN_BITS].get_dataptr()), frame_id);
+
+		return status_t::SUCCESS;
+	});
 }
 
 template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
@@ -174,6 +192,13 @@ const std::vector<bool>& Decoder_polar_SCL_naive<B,R,F,G>
 ::get_frozen_bits() const
 {
 	return this->frozen_bits;
+}
+
+template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
+void Decoder_polar_SCL_naive<B,R,F,G>
+::_set_known_bits(const B *KNOWN_BITS, const size_t frame_id)
+{
+	this->known_bits.assign(KNOWN_BITS, KNOWN_BITS + this->N);
 }
 
 template <typename B, typename R, tools::proto_f<R> F, tools::proto_g<B,R> G>
@@ -508,7 +533,23 @@ int Decoder_polar_SCL_naive<B,R,F,G>
 ::_decode_siho_cw_flexible_frozen(const R *Y_N, const B *F_N, B *V_N, const size_t frame_id)
 {
 //	auto t_load = std::chrono::steady_clock::now(); // ----------------------------------------------------------- LOAD
-	this->_load(Y_N);
+	// Amplify the channel LLRs at the known input-side positions (the BGL
+	// shortened and punctured padding bits, fixed to the public constant 0).
+	// Uses exactly the same float arithmetic as the former Python-side
+	// shortener (add_LLR = 16): y_out = y + ((m * y) * 16) with m in {0,1},
+	// so y_out = 17 * y at the masked positions, bit-for-bit identical.
+	const R *Y_N_eff = Y_N;
+	if ((int)this->known_bits.size() == this->N)
+	{
+		this->Y_N_known.resize(this->N);
+		for (auto i = 0; i < this->N; i++)
+		{
+			const R m = (R)this->known_bits[i];
+			this->Y_N_known[i] = Y_N[i] + ((m * Y_N[i]) * (R)16.0f);
+		}
+		Y_N_eff = this->Y_N_known.data();
+	}
+	this->_load(Y_N_eff);
 //	auto d_load = std::chrono::steady_clock::now() - t_load;
 
 //	auto t_decod = std::chrono::steady_clock::now(); // -------------------------------------------------------- DECODE

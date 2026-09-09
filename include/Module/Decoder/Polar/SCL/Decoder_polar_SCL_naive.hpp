@@ -49,9 +49,18 @@ protected:
 	// add a bool flag to indicate whether the decoding was successful or not
 	bool decode_success;
 
+	// 0/1 mask over the N input-side positions whose bit value is a public
+	// constant (BGL shortened and punctured padding bits are both fixed to 0
+	// by the padding). When set via the 'set_known_bits' task, the channel
+	// LLRs at these positions are amplified inside the decoder (see
+	// _decode_siho_cw_flexible_frozen), replacing the external shortener.
+	std::vector<B> known_bits;
+	std::vector<R> Y_N_known;  // scratch buffer for the LLR amplification
+
 public:
-	inline Task&   operator[](const dec::tsk                               t);
+	inline Task&   operator[](const dec::tsk                                t);
 	inline Socket& operator[](const dec::sck::decode_siho_cw_flexible_frozen  s);
+	inline Socket& operator[](const dec::sck::set_known_bits                 s);
 
 	template <class AR = std::allocator<R>, class AB = std::allocator<B>>
 	int decode_siho_cw_flexible_frozen(const std::vector<R,AR>& Y_N, const std::vector<B,AB>& F_N, std::vector<int8_t,AB>& CWD, std::vector<B,AB>& V_K,
@@ -78,6 +87,7 @@ protected:
 	        void recursive_deep_copy(const tools::Binary_node<Contents_SCL<B,R>> *nref,
 	                                       tools::Binary_node<Contents_SCL<B,R>> *nclone);
 
+	        void _set_known_bits(const B *KNOWN_BITS, const size_t frame_id  );
 	        void _load          (const R *Y_N                               );
 	        void _decode        (const size_t frame_id                      );
 	        int  _decode_siho   (const R *Y_N, B *V_K, const size_t frame_id);
